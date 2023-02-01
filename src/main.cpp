@@ -1,6 +1,6 @@
 #include <Arduino.h>
-#define CAYENNE_PRINT Serial     // Comment this out to disable prints and save space
-#include <CayenneMQTTEthernet.h> // Change this to use a different communication device. See Communications examples.
+#define CAYENNE_PRINT Serial     
+#include <CayenneMQTTEthernet.h>
 #include <Servo.h>
 // ********//
 // decalarations des instance de servvo moteur
@@ -16,11 +16,8 @@ char clientID[] = "d7b34a90-9aab-11ed-b193-d9789b2af62b";
 #define ldrtopl A1    // top-left LDR
 #define ldrbotr A2    // bottom-right LDR
 #define ldrbotl A3    // bottom-left LDR
-#define pot A4        // bottom-left LDR
-#define modeButton 12 // push button pour switcher entre le  mode automatic et le mode manuel
-#define axeButton 11
 #define manueLed 2
-#define autoLed 3 // push button pour switcher le controle entre l'axe horizontal et vertical
+#define autoLed 
 
 // les PIN qu'on va brancher les sevo motor
 #define horiPin 7
@@ -28,9 +25,9 @@ char clientID[] = "d7b34a90-9aab-11ed-b193-d9789b2af62b";
 // Sensibility Horizontal et verticale
 int Hsensibility = 30;      // measurement sensitivity
 int Vsensibility = 30;      // measurement sensitivity
-int manuelSensibility = 60; // measurement sensitivity
+int manualSensibility = 60; // Manual Mode sensitivity
 
-int mode, axe, modeState, axeState, potValue, HprevpotValue, VprevpotValue = 0;
+int mode, axe, modeState, potValue, HprevpotValue, VprevpotValue = 0;
 // declaration des variable pour recevoie des valeur des chaque LDR
 int topl, topr, botl, botr, avgtop, avgbot, avgleft, avgright = 0;
 // variable pour stocker la position acctuelle du chaque servo
@@ -42,17 +39,12 @@ void modeSwicher();
 // ------------------------------------------------------------------------------------------------------------//
 void setup()
 {
+  // pour alimentation reserver pin a HIGH 5v
   pinMode(38,OUTPUT);
   digitalWrite(38,HIGH);
-  // Serial.println("setup"); // serial connection setup  //opens serial port, sets data rate to 9600 bps
-  // Serial.println("CLEARDATA");                       //clear all data that’s been place in already
-  // Serial.println("LABEL,t,voltage,current,power,Mode");
   // **************//
   // initialisation des Serial et les E/S direction
-  Serial.begin(9600);
-  Cayenne.begin(username, password, clientID);
-  pinMode(modeButton, INPUT_PULLUP); // Mode switch Button
-  pinMode(axeButton, INPUT_PULLUP);  // Axis switch
+  Serial.begin(115200);
   pinMode(manueLed, OUTPUT);
   pinMode(autoLed, OUTPUT);
 
@@ -61,15 +53,13 @@ void setup()
   verti_servo.write(90);
   hori_servo.write(40);
 
+  Cayenne.begin(username, password, clientID);
   Serial.println("initialise");
   delay(2000);
 }
 
 void loop()
 {
-  
-  // fonction pour detecter la click sur push button pour changer le mode (A/M)
-  // modeSwicher();
   // pour notifier la mode actuelle et activer le mode convonable
   if (mode == 0)
   {
@@ -126,7 +116,6 @@ void automaticMode()
   // commande les moteur : si la valeur absulue différent entre top et bottom > de la sensibilite
   if (abs(Hdifferent) >= Hsensibility)
   {
-
     leftRightPosition = hori_servo.read();
     Serial.print("left right Position : ");
     Serial.println(leftRightPosition);
@@ -146,7 +135,6 @@ void automaticMode()
     }
     Serial.println("--------- horizontal Servo Control -------------");
   }
-  // modeSwicher();
 
   // commande de moteur vertical ******//
   // commande les moteur : si la valeur absulue différent entre right et left > de la sensibilite
@@ -171,91 +159,84 @@ void automaticMode()
     }
     Serial.println("--------- vertical Servo Control -------------");
   }
-  modeSwicher();
+
+  // Sens data to cayenne 
+    // lde top right
+    Cayenne.virtualWrite(0, topr);
+    // lde top left
+    Cayenne.virtualWrite(1, topl);
+    // lde bottom right
+    Cayenne.virtualWrite(2, botr);
+    // lde bottom  left
+    Cayenne.virtualWrite(3, botl);
+    // Servo horizontal
+    Cayenne.virtualWrite(4, leftRightPosition);
+    // Servo vertical
+    Cayenne.virtualWrite(5, upDownPosition);
 
 }
 
-void modeSwicher()
-{
-  
-  // modeState = digitalRead(modeButton);
-  // if (modeState == 0)
-  // {
-  //   //     condition   True False
-  //   mode = (mode == 0) ? 1 : 0;
-  // }
-}
 void manualMode()
 {
-  axeState = digitalRead(axeButton);
-  //   condition   True False
-  axe = (axeState == 0) ? 1 : 0;
-  delay(50);
-  if (axe == 0)
-  {
-    potValue = analogRead(pot);
-    int potDifferent = potValue - HprevpotValue;
-    if (abs(potDifferent) > manuelSensibility)
-    {
-      hori_servo.write(map(potValue, 0, 1023, 0, 180));
-      HprevpotValue = potValue;
-    }
-  }
-  else
-  {
-    potValue = analogRead(pot);
-    int potDifferent = potValue - VprevpotValue;
-    if (abs(potDifferent) > manuelSensibility)
-    {
-      verti_servo.write(map(potValue, 0, 1023, 0, 180));
-      VprevpotValue = potValue;
-    }
-  }
+  Cayenne.loop();
 }
-CAYENNE_OUT(0) {
-  // lire la valeur de ldr top right
- int value=analogRead(ldrtopr); 
- Cayenne.virtualWrite(0, value);
-}
-CAYENNE_OUT(1) {
-  // lire la valeur de ldr top left
- int value=analogRead(ldrtopl); 
- Cayenne.virtualWrite(1, value);
-}
-CAYENNE_OUT(2) {
-  // lire la valeur de ldr bottom right
- int value=analogRead(ldrbotr); 
- Cayenne.virtualWrite(2, value);
-}
-CAYENNE_OUT(3) {
-  // lire la valeur de ldr bottom left
- int value=analogRead(ldrbotl); 
- Cayenne.virtualWrite(3, value);
-}
-CAYENNE_OUT(4) {
-  // lire la valeur de servo vertical
- int value=verti_servo.read();
- Cayenne.virtualWrite(4, value);
-}
-CAYENNE_OUT(5) {
-  // lire la valeur de servo horizontal
- int value=hori_servo.read();
- Cayenne.virtualWrite(5, value);
-}
+
+// CAYENNE_OUT(0) {
+//   // lire la valeur de ldr top right
+//   int value=analogRead(ldrtopr); 
+//   Cayenne.virtualWrite(0, value);
+// }
+// CAYENNE_OUT(1) {
+//   // lire la valeur de ldr top left
+//   int value=analogRead(ldrtopl); 
+//   Cayenne.virtualWrite(1, value);
+// }
+// CAYENNE_OUT(2) {
+//   // lire la valeur de ldr bottom right
+//   int value=analogRead(ldrbotr); 
+//   Cayenne.virtualWrite(2, value);
+// }
+// CAYENNE_OUT(3) {
+//   // lire la valeur de ldr bottom left
+//   int value=analogRead(ldrbotl); 
+//   Cayenne.virtualWrite(3, value);
+// }
+// CAYENNE_OUT(4) {
+//   // lire la valeur de servo vertical
+//   int value=verti_servo.read();
+//   Cayenne.virtualWrite(4, value);
+// }
+// CAYENNE_OUT(5) {
+//   // lire la valeur de servo horizontal
+//   int value=hori_servo.read();
+//   Cayenne.virtualWrite(5, value);
+// }
+
+// ***************
 CAYENNE_IN(6) {
   // commander le servo vertical
- int value = getValue.asInt();
- CAYENNE_LOG("Channel %d, pin %d, value %d", 6, vertiPin, value);
- verti_servo.write(value);
+  CAYENNE_LOG("Channel %d, pin %d, value %d", 6, vertiPin, value);
+  int value = getValue.asInt();
+  verti_servo.write(value);
 }
 CAYENNE_IN(7) {
   // commnader le servo horizontal
- int value = getValue.asInt();
- CAYENNE_LOG("Channel %d, pin %d, value %d", 7, horiPin, value);
- hori_servo.write(value);
+  CAYENNE_LOG("Channel %d, pin %d, value %d", 7, horiPin, value);
+  int value = getValue.asInt();
+  hori_servo.write(value);
 }
 CAYENNE_IN(8) {
   // switch mode
- mode = getValue.asInt();
- CAYENNE_LOG("Channel %d, pin %d, value %d", 8, modeButton, mode);
+  mode = getValue.asInt();
 }
+
+// void modeSwicher()
+// {
+  
+//   modeState = digitalRead(modeButton);
+//   if (modeState == 0)
+//   {
+//     //     condition   True False
+//     mode = (mode == 0) ? 1 : 0;
+//   }
+// }
